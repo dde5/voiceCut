@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>進階純前端音檔編輯工作站</title>
+    <!-- 引入 LameJS MP3 編碼器 -->
+    <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #1a73e8;
+            --secondary-color: #34a853;
+            --danger-color: #ea4335;
+            --warning-color: #fbbc05;
+            --light-gray: #f0f2f5;
+            --medium-gray: #e0e0e0;
+            --dark-gray: #5f6368;
+            --text-color: #333;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--light-gray);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .main-container {
+            display: flex;
+            gap: 20px;
+            width: 100%;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .editor-panel {
+            flex: 3;
+            background-color: #fff;
+            padding: 25px 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        .clips-panel {
+            flex: 1;
+            background-color: #fff;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            height: fit-content;
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+        h1 { color: var(--primary-color); margin-bottom: 10px; }
+        h2 { border-bottom: 2px solid var(--light-gray); padding-bottom: 10px; margin-top: 0;}
+        p.subtitle { color: var(--dark-gray); margin-bottom: 25px; }
+        #file-input-label { display: inline-block; padding: 12px 25px; background-color: var(--primary-color); color: #fff; border-radius: 5px; cursor: pointer; transition: background-color 0.3s; font-size: 16px; }
+        #file-input-label:hover { background-color: #185abc; }
+        #file-input { display: none; }
+        #loader { border: 5px solid #f3f3f3; border-top: 5px solid var(--primary-color); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .hidden { display: none; }
+        .control-group { border: 1px solid var(--medium-gray); border-radius: 8px; padding: 15px; margin-top: 20px; }
+        .control-group h3 { margin: 0 0 15px 0; font-size: 16px; color: #3c4043; text-align: left; }
+        .flex-center { display: flex; justify-content: center; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .button-like { padding: 8px 15px; font-size: 16px; border: 1px solid #ccc; background-color: #fff; border-radius: 5px; cursor: pointer; font-weight: 500;}
+        .button-like:hover:not(:disabled) { background-color: #f1f1f1; }
+        .button-like:disabled { background-color: #f5f5f5; color: #aaa; cursor: not-allowed; }
+        #waveform-container { position: relative; width: 100%; height: 150px; background-color: #f8f9fa; border-radius: 5px; border: 1px solid #ddd; cursor: crosshair; touch-action: none; }
+        #waveform-canvas { display: block; width: 100%; height: 100%; }
+        #selection-overlay { position: absolute; top: 0; height: 100%; background-color: rgba(26, 115, 232, 0.3); border-left: 2px solid var(--primary-color); border-right: 2px solid var(--primary-color); pointer-events: none; box-sizing: border-box; }
+        .time-inputs { display: flex; justify-content: center; gap: 20px; margin: 20px 0; flex-wrap: wrap; }
+        .time-inputs .input-group { display: flex; flex-direction: column; align-items: flex-start; }
+        .time-inputs label { margin-bottom: 5px; font-size: 14px; color: #3c4043; }
+        .time-inputs input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 120px; font-size: 16px; text-align: right; }
+        .time-display { font-size: 12px; color: var(--dark-gray); height: 16px; margin-top: 4px; }
+        #status-text { margin-top: 15px; font-style: italic; color: var(--dark-gray); min-height: 20px; }
+        #file-info { font-weight: bold; margin-bottom: 10px; }
+        #warning-text { color: var(--danger-color); font-weight: bold; margin: 10px 0; }
+        /* Clips Panel Styles */
+        #clip-list { list-style-type: none; padding: 0; margin: 0; }
+        .clip-item { background: #f9f9f9; border: 1px solid var(--medium-gray); border-radius: 6px; padding: 10px; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; }
+        .clip-item input[type="checkbox"] { width: 20px; height: 20px; }
+        .clip-name { flex-grow: 1; font-weight: bold; cursor: pointer; }
+        .clip-controls button { padding: 5px 8px; font-size: 14px; }
+        .primary-action-btn { background-color: var(--secondary-color); color: white; border: none; }
+        .primary-action-btn:hover:not(:disabled) { background-color: #2c9c47; }
+        .danger-btn { background-color: var(--danger-color); color: white; border: none; }
+        .danger-btn:hover:not(:disabled) { background-color: #d13528; }
+        #clips-panel-controls { margin-top: 15px; }
+    </style>
+</head>
+<body>
+
+    <div class="main-container">
+        <div class="editor-panel">
+            <h1>進階純前端音檔編輯工作站</h1>
+            <p class="subtitle">拖曳選取、分段剪輯、多格式匯出，您的音訊處理中心。</p>
+
+            <div id="initial-screen">
+                <input type="file" id="file-input" accept="audio/*,video/mp4,audio/flac,audio/m4a">
+                <label for="file-input" id="file-input-label">選擇檔案</label>
+            </div>
+            
+            <div id="loader" class="hidden"></div>
+            <p id="warning-text" class="hidden"></p>
+            <p id="status-text"></p>
+
+            <div id="controls-section" class="hidden">
+                <div id="file-info"></div>
+                
+                <div class="control-group">
+                    <h3>波形檢視與選取 (可拖曳選取)</h3>
+                    <div id="waveform-container">
+                        <canvas id="waveform-canvas"></canvas>
+                        <div id="selection-overlay"></div>
+                    </div>
+                    <div class="flex-center" style="margin-top: 10px;">
+                        <button id="pan-left-btn" class="button-like">◀</button>
+                        <button id="zoom-out-btn" class="button-like">-</button>
+                        <button id="zoom-in-btn" class="button-like">+</button>
+                        <button id="pan-right-btn" class="button-like">▶</button>
+                    </div>
+                </div>
+
+                <div class="time-inputs">
+                    <div class="input-group">
+                        <label for="start-time">開始時間 (秒)</label>
+                        <input type="number" id="start-time" step="0.01" min="0">
+                        <div class="time-display" id="start-time-formatted">0:00:00.00</div>
+                    </div>
+                    <div class="input-group">
+                        <label for="end-time">結束時間 (秒)</label>
+                        <input type="number" id="end-time" step="0.01" min="0">
+                        <div class="time-display" id="end-time-formatted">0:00:00.00</div>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <h3>操作</h3>
+                    <div class="flex-center">
+                        <button id="play-selection-btn" class="button-like" disabled>▶ 播放選區</button>
+                        <button id="extract-clip-btn" class="button-like primary-action-btn" disabled>⎚ 提取至列表</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="clips-panel hidden" id="clips-panel">
+            <h2>剪輯片段列表</h2>
+            <ul id="clip-list">
+                <!-- Clips will be added here by JavaScript -->
+            </ul>
+            <div id="clips-panel-controls" class="flex-center">
+                <button id="combine-clips-btn" class="button-like" disabled>🧬 合併選取片段</button>
+                <button id="clear-clips-btn" class="button-like danger-btn" disabled>🗑️ 清空列表</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+// --- DOM 元素 ---
+const fileInput = document.getElementById('file-input'), initialScreen = document.getElementById('initial-screen');
+const loader = document.getElementById('loader'), statusText = document.getElementById('status-text'), warningText = document.getElementById('warning-text');
+const controlsSection = document.getElementById('controls-section'), fileInfo = document.getElementById('file-info');
+const clipsPanel = document.getElementById('clips-panel'), clipList = document.getElementById('clip-list');
+const canvas = document.getElementById('waveform-canvas'), ctx = canvas.getContext('2d'), waveformContainer = document.getElementById('waveform-container'), selectionOverlay = document.getElementById('selection-overlay');
+const startTimeInput = document.getElementById('start-time'), endTimeInput = document.getElementById('end-time');
+const startTimeFormatted = document.getElementById('start-time-formatted'), endTimeFormatted = document.getElementById('end-time-formatted');
+const zoomInBtn = document.getElementById('zoom-in-btn'), zoomOutBtn = document.getElementById('zoom-out-btn'), panLeftBtn = document.getElementById('pan-left-btn'), panRightBtn = document.getElementById('pan-right-btn');
+const playSelectionBtn = document.getElementById('play-selection-btn'), extractClipBtn = document.getElementById('extract-clip-btn');
+const combineClipsBtn = document.getElementById('combine-clips-btn'), clearClipsBtn = document.getElementById('clear-clips-btn');
+
+// --- 狀態變數 ---
+let audioContext, mainBuffer = null, originalFileName = '';
+let viewStartTime = 0, viewEndTime = 0;
+let isDragging = false, dragStartSeconds = 0;
+let activeSourceNode = null;
+let clips = [];
+
+// --- 初始化與事件監聽 ---
+function initAudioContext() {
+    if (!audioContext) {
+        try {
+            window.AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioContext = new AudioContext();
+            // 在用戶首次交互後恢復AudioContext，避免瀏覽器自動播放策略限制
+            const resumeContext = () => {
+                if (audioContext.state === 'suspended') audioContext.resume();
+                document.body.removeEventListener('click', resumeContext);
+            };
+            document.body.addEventListener('click', resumeContext);
+        } catch (e) {
+            alert('您的瀏覽器不支援 Web Audio API，無法使用此工具。');
+        }
+    }
+}
+initAudioContext();
+
+fileInput.addEventListener('change', handleFileSelect);
+[startTimeInput, endTimeInput].forEach(input => input.addEventListener('input', handleTimeInputChange));
+zoomInBtn.addEventListener('click', () => zoom(0.5));
+zoomOutBtn.addEventListener('click', () => zoom(2.0));
+panLeftBtn.addEventListener('click', () => pan(-1));
+panRightBtn.addEventListener('click', () => pan(1));
+
+playSelectionBtn.addEventListener('click', togglePlaySelection);
+extractClipBtn.addEventListener('click', handleExtractClip);
+combineClipsBtn.addEventListener('click', handleCombineClips);
+clearClipsBtn.addEventListener('click', handleClearClips);
+
+// 波形圖拖曳選取事件
+waveformContainer.addEventListener('pointerdown', handleDragStart);
+waveformContainer.addEventListener('pointermove', handleDragMove);
+waveformContainer.addEventListener('pointerup', handleDragEnd);
+waveformContainer.addEventListener('pointerleave', handleDragEnd);
+
+// Canvas尺寸自適應
+const resizeObserver = new ResizeObserver(entries => {
+    for (let entry of entries) {
+        const { width, height } = entry.contentRect;
+        canvas.width = width;
+        canvas.height = height;
+        updateAllVisuals();
+    }
+});
+resizeObserver.observe(waveformContainer);
+
+// --- 核心功能函數 ---
+
+/** 處理檔案選擇 */
+async function handleFileSelect(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    initAudioContext();
+    if (!audioContext) return;
+    
+    originalFileName = file.name;
+    resetUI();
+    setLoading(true, '正在讀取檔案...');
+    
+    if (file.size > 300 * 1024 * 1024) {
+        warningText.textContent = '警告：檔案非常大，瀏覽器可能因記憶體不足而解碼失敗或崩潰。';
+        warningText.classList.remove('hidden');
+    }
+
+    try {
+        const arrayBuffer = await file.arrayBuffer();
+        setLoading(true, '正在解碼音訊... 這可能需要一些時間...');
+        mainBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        setupControls();
+        setLoading(false, '解碼完成！請在波形圖上拖曳以選取範圍。');
+    } catch (error) {
+        setLoading(false, `錯誤：無法解碼此檔案。請確認格式受支援。`);
+        console.error('解碼錯誤:', error);
+    }
+}
+
+/** 設置控制項 */
+function setupControls() {
+    initialScreen.classList.add('hidden');
+    controlsSection.classList.remove('hidden');
+    clipsPanel.classList.remove('hidden');
+    updateUIForNewBuffer();
+}
+
+/** 更新UI以反映新的主音訊緩衝區 */
+function updateUIForNewBuffer() {
+    const duration = mainBuffer.duration;
+    fileInfo.textContent = `檔案: ${originalFileName} | 總長度: ${formatTime(duration)}`;
+    
+    startTimeInput.value = 0;
+    endTimeInput.value = duration.toFixed(3);
+    [startTimeInput, endTimeInput].forEach(input => {
+        input.max = duration.toFixed(3);
+        input.step = "0.001";
+    });
+    
+    viewStartTime = 0;
+    viewEndTime = duration;
+
+    handleTimeInputChange();
+}
+
+/** 拖曳選取開始 */
+function handleDragStart(e) {
+    e.preventDefault();
+    isDragging = true;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    dragStartSeconds = viewStartTime + (x / canvas.width) * (viewEndTime - viewStartTime);
+    dragStartSeconds = Math.max(0, dragStartSeconds);
+    
+    startTimeInput.value = dragStartSeconds.toFixed(3);
+    endTimeInput.value = dragStartSeconds.toFixed(3);
+    handleTimeInputChange();
+}
+
+/** 拖曳選取移動 */
+function handleDragMove(e) {
+    if (!isDragging) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    let currentSeconds = viewStartTime + (x / canvas.width) * (viewEndTime - viewStartTime);
+    currentSeconds = Math.max(0, Math.min(mainBuffer.duration, currentSeconds));
+
+    if (currentSeconds > dragStartSeconds) {
+        startTimeInput.value = dragStartSeconds.toFixed(3);
+        endTimeInput.value = currentSeconds.toFixed(3);
+    } else {
+        startTimeInput.value = currentSeconds.toFixed(3);
+        endTimeInput.value = dragStartSeconds.toFixed(3);
+    }
+    handleTimeInputChange();
+}
+
+/** 拖曳選取結束 */
+function handleDragEnd() {
+    isDragging = false;
+}
+
+/** 時間輸入框變動處理 */
+function handleTimeInputChange() {
+    validateAndSyncTimes();
+    updateAllVisuals();
+}
+
+/** 驗證並同步時間 */
+function validateAndSyncTimes() {
+    let start = parseFloat(startTimeInput.value);
+    let end = parseFloat(endTimeInput.value);
+    const duration = mainBuffer.duration;
+
+    if (isNaN(start)) start = 0;
+    if (isNaN(end)) end = duration;
+
+    // 確保 start < end
+    if (start > end) [start, end] = [end, start];
+
+    start = Math.max(0, Math.min(start, duration));
+    end = Math.max(0, Math.min(end, duration));
+    
+    if (parseFloat(startTimeInput.value).toFixed(3) !== start.toFixed(3)) startTimeInput.value = start.toFixed(3);
+    if (parseFloat(endTimeInput.value).toFixed(3) !== end.toFixed(3)) endTimeInput.value = end.toFixed(3);
+    
+    startTimeFormatted.textContent = formatTime(start);
+    endTimeFormatted.textContent = formatTime(end);
+
+    const selectionExists = start < end;
+    playSelectionBtn.disabled = !selectionExists;
+    extractClipBtn.disabled = !selectionExists;
+}
+
+
+// --- 播放控制 ---
+
+/** 播放/暫停選取範圍 */
+function togglePlaySelection() {
+    if (activeSourceNode) {
+        stopPlayback();
+    } else {
+        const start = parseFloat(startTimeInput.value);
+        const end = parseFloat(endTimeInput.value);
+        if (end > start) {
+            playBuffer(mainBuffer, start, end - start);
+        }
+    }
+}
+
+/** 播放指定的AudioBuffer片段 */
+function playBuffer(buffer, start, duration, onEndedCallback = null) {
+    stopPlayback(); // 停止任何正在播放的音訊
+    activeSourceNode = audioContext.createBufferSource();
+    activeSourceNode.buffer = buffer;
+    activeSourceNode.connect(audioContext.destination);
+    activeSourceNode.onended = () => {
+        stopPlayback();
+        if (onEndedCallback) onEndedCallback();
+    };
+    activeSourceNode.start(0, start, duration);
+    
+    // 更新主播放按鈕狀態
+    playSelectionBtn.textContent = '❚❚ 暫停';
+}
+
+/** 停止播放 */
+function stopPlayback() {
+    if (activeSourceNode) {
+        try {
+            activeSourceNode.stop();
+        } catch(e) { /* Already stopped */ }
+        activeSourceNode.disconnect();
+        activeSourceNode = null;
+    }
+    playSelectionBtn.textContent = '▶ 播放選區';
+}
+
+
+// --- 剪輯列表 (Clips) 功能 ---
+
+/** 提取片段到列表 */
+async function handleExtractClip() {
+    if (!mainBuffer || extractClipBtn.disabled) return;
+    
+    const startTime = parseFloat(startTimeInput.value);
+    const endTime = parseFloat(endTimeInput.value);
+    
+    setLoading(true, "正在提取片段...");
+    await new Promise(r => setTimeout(r, 50));
+
+    try {
+        const slicedBuffer = sliceAudioBuffer(mainBuffer, startTime, endTime);
+        const newClip = {
+            id: Date.now(),
+            name: `片段 ${clips.length + 1}`,
+            buffer: slicedBuffer,
+        };
+        clips.push(newClip);
+        renderClipList();
+        setLoading(false, '片段已成功提取至列表！');
+    } catch (error) {
+        setLoading(false, '提取片段時發生錯誤。');
+        console.error("提取錯誤:", error);
+    }
+}
+
+/** 渲染剪輯列表UI */
+function renderClipList() {
+    clipList.innerHTML = '';
+    clips.forEach(clip => {
+        const li = document.createElement('li');
+        li.className = 'clip-item';
+        li.dataset.id = clip.id;
+        li.innerHTML = `
+            <input type="checkbox" class="clip-checkbox">
+            <span class="clip-name">${clip.name}</span>
+            <div class="clip-controls">
+                <button class="button-like play-clip-btn">▶</button>
+                <button class="button-like download-clip-btn">💾</button>
+                <button class="button-like delete-clip-btn">🗑️</button>
+            </div>
+        `;
+        clipList.appendChild(li);
+    });
+
+    // 重新綁定事件
+    clipList.querySelectorAll('.play-clip-btn').forEach(btn => btn.onclick = e => {
+        const id = parseInt(e.target.closest('.clip-item').dataset.id);
+        const clip = clips.find(c => c.id === id);
+        playBuffer(clip.buffer, 0, clip.buffer.duration);
+    });
+    clipList.querySelectorAll('.download-clip-btn').forEach(btn => btn.onclick = e => {
+        const id = parseInt(e.target.closest('.clip-item').dataset.id);
+        handleDownloadClip(id);
+    });
+    clipList.querySelectorAll('.delete-clip-btn').forEach(btn => btn.onclick = e => {
+        if (confirm('確定要刪除這個片段嗎？')) {
+            const id = parseInt(e.target.closest('.clip-item').dataset.id);
+            clips = clips.filter(c => c.id !== id);
+            renderClipList();
+        }
+    });
+    clipList.querySelectorAll('.clip-name').forEach(span => span.onclick = e => {
+        const newName = prompt('請輸入新的片段名稱：', e.target.textContent);
+        if (newName) {
+            const id = parseInt(e.target.closest('.clip-item').dataset.id);
+            const clip = clips.find(c => c.id === id);
+            clip.name = newName;
+            e.target.textContent = newName;
+        }
+    });
+
+    // 更新合併和清空按鈕的狀態
+    combineClipsBtn.disabled = clips.length < 2;
+    clearClipsBtn.disabled = clips.length === 0;
+}
+
+/** 合併選取的片段 */
+async function handleCombineClips() {
+    const selectedClips = [];
+    document.querySelectorAll('.clip-item .clip-checkbox:checked').forEach(checkbox => {
+        const id = parseInt(checkbox.closest('.clip-item').dataset.id);
+        selectedClips.push(clips.find(c => c.id === id));
+    });
+
+    if (selectedClips.length < 2) {
+        alert('請至少選擇兩個片段進行合併。');
+        return;
+    }
+
+    setLoading(true, "正在合併片段...");
+    await new Promise(r => setTimeout(r, 50));
+    
+    try {
+        const totalLength = selectedClips.reduce((sum, clip) => sum + clip.buffer.length, 0);
+        const numChannels = selectedClips[0].buffer.numberOfChannels;
+        const sampleRate = selectedClips[0].buffer.sampleRate;
+        
+        const combinedBuffer = audioContext.createBuffer(numChannels, totalLength, sampleRate);
+        let offset = 0;
+
+        for (const clip of selectedClips) {
+            for (let i = 0; i < numChannels; i++) {
+                combinedBuffer.getChannelData(i).set(clip.buffer.getChannelData(i), offset);
+            }
+            offset += clip.buffer.length;
+        }
+        
+        const newClip = {
+            id: Date.now(),
+            name: `合併片段 ${clips.filter(c => c.name.startsWith('合併')).length + 1}`,
+            buffer: combinedBuffer,
+        };
+        clips.push(newClip);
+        renderClipList();
+        setLoading(false, "片段合併成功！");
+    } catch (e) {
+        setLoading(false, "合併片段時出錯。");
+        console.error(e);
+    }
+}
+
+/** 清空列表 */
+function handleClearClips() {
+    if (confirm('確定要清空所有片段嗎？此操作無法復原。')) {
+        clips = [];
+        renderClipList();
+    }
+}
+
+
+// --- 下載功能 ---
+
+/** 處理單個片段的下載請求 */
+function handleDownloadClip(clipId) {
+    const format = prompt("請選擇下載格式：輸入 'mp3' 或 'wav'", "mp3")?.toLowerCase();
+    if (!format || (format !== 'mp3' && format !== 'wav')) return;
+    
+    const clip = clips.find(c => c.id === clipId);
+    if (!clip) return;
+    
+    setLoading(true, `正在編碼為 ${format.toUpperCase()}...`);
+    
+    // 使用setTimeout確保UI更新
+    setTimeout(() => {
+        try {
+            let blob, extension;
+            if (format === 'mp3') {
+                blob = bufferToMp3(clip.buffer);
+                extension = 'mp3';
+            } else {
+                blob = bufferToWav(clip.buffer);
+                extension = 'wav';
+            }
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `${clip.name.replace(/\s/g, '_')}.${extension}`;
+            document.body.appendChild(a);
+            a.click();
+            URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            setLoading(false, `下載已開始！`);
+        } catch (error) {
+            setLoading(false, `編碼或下載時發生錯誤。`);
+            console.error(error);
+        }
+    }, 50);
+}
+
+
+// --- 輔助與工具函數 ---
+
+/** 格式化時間 (秒 -> H:MM:SS.sss) */
+function formatTime(seconds) {
+    if (isNaN(seconds) || seconds < 0) return "0:00:00.000";
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+    const ms = Math.round((seconds - Math.floor(seconds)) * 1000);
+    return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(ms).padStart(3, '0')}`;
+}
+
+/** 設置載入狀態 */
+function setLoading(isLoading, message = '') {
+    loader.classList.toggle('hidden', !isLoading);
+    statusText.textContent = message;
+    document.body.style.cursor = isLoading ? 'wait' : 'default';
+}
+
+/** 重置UI到初始狀態 */
+function resetUI() {
+    controlsSection.classList.add('hidden');
+    clipsPanel.classList.add('hidden');
+    initialScreen.classList.remove('hidden');
+    warningText.classList.add('hidden');
+    mainBuffer = null;
+    clips = [];
+    renderClipList();
+}
+
+/** 更新所有視覺元素 */
+function updateAllVisuals() {
+    if (!mainBuffer) return;
+    drawWaveform();
+    drawSelectionOverlay();
+}
+
+/** 繪製波形 */
+function drawWaveform() {
+    if (!mainBuffer || !canvas.width || !canvas.height) return;
+    const data = mainBuffer.getChannelData(0);
+    const sampleRate = mainBuffer.sampleRate;
+    const canvasWidth = canvas.width, canvasHeight = canvas.height;
+    const amp = canvasHeight / 2;
+
+    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgb(26, 115, 232)';
+    ctx.beginPath();
+    
+    const viewSampleStart = Math.floor(viewStartTime * sampleRate);
+    const viewSampleEnd = Math.ceil(viewEndTime * sampleRate);
+    const totalViewSamples = viewSampleEnd - viewSampleStart;
+    if (totalViewSamples <= 0) return;
+    
+    const samplesPerPixel = Math.max(1, Math.floor(totalViewSamples / canvasWidth));
+
+    for (let x = 0; x < canvasWidth; x++) {
+        const sampleStartIndex = viewSampleStart + (x * samplesPerPixel);
+        let min = 1.0, max = -1.0;
+        for (let i = 0; i < samplesPerPixel; i++) {
+            const sample = data[sampleStartIndex + i];
+            if (sample < min) min = sample;
+            if (sample > max) max = sample;
+        }
+        ctx.moveTo(x, (1 - max) * amp);
+        ctx.lineTo(x, (1 - min) * amp);
+    }
+    ctx.stroke();
+}
+
+/** 繪製選擇區域覆蓋層 */
+function drawSelectionOverlay() {
+    const start = parseFloat(startTimeInput.value);
+    const end = parseFloat(endTimeInput.value);
+    const viewDuration = viewEndTime - viewStartTime;
+    if (viewDuration <= 0) return;
+
+    const left = Math.max(0, (start - viewStartTime) / viewDuration * 100);
+    const right = Math.min(100, (end - viewStartTime) / viewDuration * 100);
+    const width = Math.max(0, right - left);
+    
+    if (width <= 0 || left >= 100 || right <= 0) {
+         selectionOverlay.style.display = 'none';
+    } else {
+        selectionOverlay.style.display = 'block';
+        selectionOverlay.style.left = `${left}%`;
+        selectionOverlay.style.width = `${width}%`;
+    }
+}
+        
+/** 縮放與平移 */
+function zoom(factor) {
+    if (!mainBuffer) return;
+    const currentDuration = viewEndTime - viewStartTime;
+    const center = viewStartTime + currentDuration / 2;
+    let newDuration = currentDuration * factor;
+    newDuration = Math.max(0.01, Math.min(newDuration, mainBuffer.duration));
+    viewStartTime = Math.max(0, center - newDuration / 2);
+    viewEndTime = Math.min(mainBuffer.duration, center + newDuration / 2);
+    updateAllVisuals();
+}
+function pan(direction) {
+    if (!mainBuffer) return;
+    const panAmount = (viewEndTime - viewStartTime) * 0.25 * direction;
+    let newStart = viewStartTime + panAmount;
+    let newEnd = viewEndTime + panAmount;
+    if (newStart < 0) { newEnd -= newStart; newStart = 0; }
+    if (newEnd > mainBuffer.duration) { newStart -= (newEnd - mainBuffer.duration); newEnd = mainBuffer.duration; }
+    viewStartTime = newStart;
+    viewEndTime = newEnd;
+    updateAllVisuals();
+}
+
+/** 從 AudioBuffer 中擷取片段 */
+function sliceAudioBuffer(buffer, startTime, endTime) {
+    const sampleRate = buffer.sampleRate;
+    const startOffset = Math.round(startTime * sampleRate);
+    const endOffset = Math.round(endTime * sampleRate);
+    const frameCount = endOffset - startOffset;
+
+    if (frameCount <= 0) throw new Error("無效的時間範圍。");
+    
+    const newBuffer = audioContext.createBuffer(buffer.numberOfChannels, frameCount, sampleRate);
+    for (let i = 0; i < buffer.numberOfChannels; i++) {
+        newBuffer.getChannelData(i).set(buffer.getChannelData(i).subarray(startOffset, endOffset));
+    }
+    return newBuffer;
+}
+
+/** 將 AudioBuffer 轉換為 WAV 格式的 Blob */
+function bufferToWav(buffer) {
+    const numOfChan = buffer.numberOfChannels, length = buffer.length * numOfChan * 2 + 44;
+    const abuffer = new ArrayBuffer(length), view = new DataView(abuffer);
+    let pos = 0;
+    const setUint16 = data => { view.setUint16(pos, data, true); pos += 2; }
+    const setUint32 = data => { view.setUint32(pos, data, true); pos += 4; }
+    setUint32(0x46464952); // "RIFF"
+    setUint32(length - 8);
+    setUint32(0x45564157); // "WAVE"
+    setUint32(0x20746d66); // "fmt "
+    setUint32(16); setUint16(1); setUint16(numOfChan);
+    setUint32(buffer.sampleRate);
+    setUint32(buffer.sampleRate * 2 * numOfChan);
+    setUint16(numOfChan * 2); setUint16(16);
+    setUint32(0x61746164); // "data"
+    setUint32(length - pos - 4);
+    const channels = Array.from({length: buffer.numberOfChannels}, (_, i) => buffer.getChannelData(i));
+    for (let offset = 0; offset < buffer.length; offset++) {
+        for (let i = 0; i < numOfChan; i++) {
+            let sample = Math.max(-1, Math.min(1, channels[i][offset]));
+            view.setInt16(pos, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+            pos += 2;
+        }
+    }
+    return new Blob([view], { type: 'audio/wav' });
+}
+
+/** 將 AudioBuffer 轉換為 MP3 格式的 Blob */
+function bufferToMp3(buffer) {
+    const numChannels = buffer.numberOfChannels;
+    const sampleRate = buffer.sampleRate;
+    const kbps = 128; // MP3 位元率
+    const mp3encoder = new lamejs.Mp3Encoder(numChannels, sampleRate, kbps);
+    const samples = [];
+
+    // 將浮點數樣本轉換為16位整數
+    for (let i = 0; i < numChannels; i++) {
+        const channelData = buffer.getChannelData(i);
+        const int16ChannelData = new Int16Array(channelData.length);
+        for (let j = 0; j < channelData.length; j++) {
+            int16ChannelData[j] = Math.max(-32768, Math.min(32767, channelData[j] * 32767));
+        }
+        samples.push(int16ChannelData);
+    }
+    
+    const mp3Data = [];
+    const sampleBlockSize = 1152;
+    for (let i = 0; i < samples[0].length; i += sampleBlockSize) {
+        const leftChunk = samples[0].subarray(i, i + sampleBlockSize);
+        const rightChunk = numChannels > 1 ? samples[1].subarray(i, i + sampleBlockSize) : leftChunk;
+        const mp3buf = mp3encoder.encodeBuffer(leftChunk, rightChunk);
+        if (mp3buf.length > 0) {
+            mp3Data.push(mp3buf);
+        }
+    }
+    const mp3buf = mp3encoder.flush();
+    if (mp3buf.length > 0) {
+        mp3Data.push(mp3buf);
+    }
+    return new Blob(mp3Data, { type: 'audio/mp3' });
+}
+</script>
+</body>
+</html>
