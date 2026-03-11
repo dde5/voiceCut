@@ -5,7 +5,70 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>全功能純前端音檔編輯工作站 (v2.2 完整版)</title>
-    <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js">
+        // --- Mobile Modals Logic ---
+        const mobileTimeOverlay = document.getElementById('mobile-time-overlay');
+        const mobileSearchOverlay = document.getElementById('mobile-search-overlay');
+        const openTimeBtn = document.getElementById('open-time-modal-btn');
+        const openSearchBtn = document.getElementById('open-search-modal-btn');
+        const originalTimeInputs = document.getElementById('original-time-inputs');
+        const originalSearchGroup = document.getElementById('original-search-group');
+        const mobileTimeContainer = document.getElementById('mobile-time-container');
+        const mobileSearchContainer = document.getElementById('mobile-search-container');
+        
+        function setupMobileModals() {
+            if (openTimeBtn) {
+                openTimeBtn.addEventListener('click', () => {
+                    // Move content
+                    if (window.innerWidth < 768) {
+                        Array.from(originalTimeInputs.children).forEach(child => mobileTimeContainer.appendChild(child));
+                    }
+                    mobileTimeOverlay.classList.add('open');
+                });
+                
+                document.getElementById('mobile-time-close-btn').addEventListener('click', closeTimeModal);
+                document.getElementById('mobile-time-done-btn').addEventListener('click', closeTimeModal);
+            }
+            
+            if (openSearchBtn) {
+                openSearchBtn.addEventListener('click', () => {
+                    if (window.innerWidth < 768) {
+                         const searchOptions = originalSearchGroup.querySelector('.search-options');
+                         const searchBtns = originalSearchGroup.querySelector('.flex-center');
+                         if(searchOptions) mobileSearchContainer.appendChild(searchOptions);
+                         if(searchBtns) mobileSearchContainer.appendChild(searchBtns);
+                    }
+                    mobileSearchOverlay.classList.add('open');
+                });
+                
+                document.getElementById('mobile-search-close-btn').addEventListener('click', closeSearchModal);
+                document.getElementById('mobile-search-done-btn').addEventListener('click', closeSearchModal);
+            }
+        }
+        
+        function closeTimeModal() {
+            mobileTimeOverlay.classList.remove('open');
+            // Move back on close to ensure desktop works if resized
+            Array.from(mobileTimeContainer.children).forEach(child => originalTimeInputs.appendChild(child));
+        }
+        
+        function closeSearchModal() {
+            mobileSearchOverlay.classList.remove('open');
+            Array.from(mobileSearchContainer.children).forEach(child => originalSearchGroup.appendChild(child));
+        }
+
+        setupMobileModals();
+
+        // Enable buttons when file is loaded
+        const originalSetupControls = setupControls;
+        setupControls = function() {
+            originalSetupControls();
+            if(openTimeBtn) openTimeBtn.disabled = false;
+            // search find segment is tied to selection, but the button to open modal should be enabled
+            if(openSearchBtn) openSearchBtn.disabled = false;
+        };
+
+    </script>
     <style>
         :root {
             --primary-color: #1a73e8;
@@ -806,6 +869,55 @@
             .time-inputs { margin-top: 5px; }
         }
 
+    
+        /* --- Mobile Modals for Time/Search --- */
+        .mobile-modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 2005;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+        .mobile-modal-overlay.open {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .mobile-modal-content {
+            background: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            width: 85%;
+            max-width: 400px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            position: relative;
+        }
+        .mobile-modal-content h3 {
+            margin-top: 0;
+            border-bottom: 1px solid var(--light-gray);
+            padding-bottom: 10px;
+        }
+        .mobile-modal-close-btn {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 24px;
+            cursor: pointer;
+            background: none;
+            border: none;
+            color: #888;
+        }
+        
+        @media (max-width: 767px) {
+            .mobile-hide-original {
+                display: none !important;
+            }
+        }
+
     </style>
 </head>
 
@@ -877,7 +989,7 @@
                                     id="secondary-waveform-canvas" class="waveform-canvas"></canvas>
                             </div>
                         </div>
-                        <div class="time-inputs">
+                        <div class="time-inputs mobile-hide-original" id="original-time-inputs">
                             <div class="input-group"><label for="main-start-time">開始時間</label><input type="number"
                                     id="main-start-time" step="0.001" min="0">
                                 <div id="main-start-time-formatted" class="time-display"></div>
@@ -887,7 +999,7 @@
                                 <div id="main-end-time-formatted" class="time-display"></div>
                             </div>
                         </div>
-                        <div class="control-group">
+                        <div class="control-group mobile-hide-original" id="original-search-group">
                             <h3>智慧尋找</h3>
                             <div class="search-options">
                                 <label>類型: <select id="main-search-type">
@@ -916,7 +1028,7 @@
                                     style="border: none; background: none; font-size: 16px; cursor: pointer; color: var(--dark-gray);">▼</button>
                             </div>
                             <div class="control-group" style="border:none; padding:0; margin:0;">
-                                <h3 style="border:none; padding:0; margin:0 0 15px 0;">主音軌操作</h3>
+                                <h3 style="border:none; padding:0; margin:0 0 15px 0;">主音軌操作 <span id="main-history-controls" style="margin-left:10px;"><button id="main-undo-btn" class="icon-btn" disabled style="font-size:16px;">↩️</button><button id="main-redo-btn" class="icon-btn" disabled style="font-size:16px;">↪️</button></span></h3>
                                 <div class="flex-center">
                                     <button id="main-play-btn" class="button-like" disabled>▶ 播放選區</button>
                                     <button id="amplify-btn" class="button-like warning-btn" disabled>🔊 增強</button>
@@ -1005,7 +1117,7 @@
                 </div>
             </div>
             <div class="control-group">
-                <h3>片段操作 (此處操作會修改片段本身)</h3>
+                <h3>片段操作 (此處操作會修改片段本身) <span id="modal-history-controls" style="margin-left:10px;"><button id="modal-undo-btn" class="icon-btn" disabled style="font-size:16px;">↩️</button><button id="modal-redo-btn" class="icon-btn" disabled style="font-size:16px;">↪️</button></span></h3>
                 <div class="flex-center">
                     <button id="modal-amplify-btn" class="button-like warning-btn" disabled>🔊 增強</button>
                     <button id="modal-keep-btn" class="button-like primary-alt-btn" disabled>🎯 保留</button>
@@ -1396,6 +1508,71 @@
         }
 
 
+        
+        // --- Undo / Redo Logic ---
+        function saveHistoryState(state) {
+            if (!state.history) {
+                state.history = [];
+                state.historyIndex = -1;
+            }
+            // Drop any future redo history
+            if (state.historyIndex < state.history.length - 1) {
+                state.history = state.history.slice(0, state.historyIndex + 1);
+            }
+            // Limit to 5 steps
+            if (state.history.length >= 5) {
+                state.history.shift();
+                state.historyIndex--;
+            }
+            // Clone audio buffer (basic manual clone to avoid reference issues)
+            const oldBuf = state.buffer;
+            const newBuf = audioContext.createBuffer(oldBuf.numberOfChannels, oldBuf.length, oldBuf.sampleRate);
+            for (let i = 0; i < oldBuf.numberOfChannels; i++) {
+                newBuf.copyToChannel(oldBuf.getChannelData(i), i);
+            }
+            
+            state.history.push({
+                buffer: newBuf,
+                duration: newBuf.duration
+            });
+            state.historyIndex++;
+            updateHistoryButtons(state);
+        }
+
+        function restoreHistoryState(state, offset) {
+            if (!state.history || state.history.length === 0) return;
+            state.historyIndex += offset;
+            const record = state.history[state.historyIndex];
+            
+            const oldBuf = record.buffer;
+            const newBuf = audioContext.createBuffer(oldBuf.numberOfChannels, oldBuf.length, oldBuf.sampleRate);
+            for (let i = 0; i < oldBuf.numberOfChannels; i++) {
+                newBuf.copyToChannel(oldBuf.getChannelData(i), i);
+            }
+            state.buffer = newBuf;
+            
+            updateUIAfterDestructiveEdit(state, state === modalEditorState);
+            updateHistoryButtons(state);
+        }
+
+        function updateHistoryButtons(state) {
+            const hasUndo = state.history && state.historyIndex > 0;
+            const hasRedo = state.history && state.historyIndex < state.history.length - 1;
+            
+            if (state === mainEditorState) {
+                document.getElementById('main-undo-btn').disabled = !hasUndo;
+                document.getElementById('main-redo-btn').disabled = !hasRedo;
+            } else {
+                document.getElementById('modal-undo-btn').disabled = !hasUndo;
+                document.getElementById('modal-redo-btn').disabled = !hasRedo;
+            }
+        }
+
+        document.getElementById('main-undo-btn')?.addEventListener('click', () => restoreHistoryState(mainEditorState, -1));
+        document.getElementById('main-redo-btn')?.addEventListener('click', () => restoreHistoryState(mainEditorState, 1));
+        document.getElementById('modal-undo-btn')?.addEventListener('click', () => restoreHistoryState(modalEditorState, -1));
+        document.getElementById('modal-redo-btn')?.addEventListener('click', () => restoreHistoryState(modalEditorState, 1));
+
         // --- Collapsible Panel Logic ---
         const stickyWrapper = document.getElementById('sticky-controls-wrapper');
         const collapseBtn = document.getElementById('collapse-panel-btn');
@@ -1465,7 +1642,7 @@
         document.querySelectorAll('.speed-preset').forEach(btn => btn.addEventListener('click', (e) => setSpeed(parseFloat(e.target.dataset.spd))));
 
         // --- 核心功能 (保持不變) ---
-        async function handleFileSelect(event) { const file = event.target.files[0]; if (!file) return; initAudioContext(); if (!audioContext) return; originalFileName = file.name; resetUI(); setLoading(true, '正在讀取檔案...'); if (file.size > 300 * 1024 * 1024) { warningText.textContent = '警告：檔案過大，瀏覽器可能崩潰。'; warningText.classList.remove('hidden'); } try { const arrayBuffer = await file.arrayBuffer(); setLoading(true, '正在解碼音訊...'); mainEditorState.buffer = await audioContext.decodeAudioData(arrayBuffer); setupControls(); setLoading(false, '解碼完成！請在主音軌上拖曳以選取範圍。'); } catch (error) { setLoading(false, `錯誤：無法解碼此檔案。`); console.error('解碼錯誤:', error); } }
+        async function handleFileSelect(event) { const file = event.target.files[0]; if (!file) return; initAudioContext(); if (!audioContext) return; originalFileName = file.name; resetUI(); setLoading(true, '正在讀取檔案...'); if (file.size > 300 * 1024 * 1024) { warningText.textContent = '警告：檔案過大，瀏覽器可能崩潰。'; warningText.classList.remove('hidden'); } try { const arrayBuffer = await file.arrayBuffer(); setLoading(true, '正在解碼音訊...'); mainEditorState.buffer = await audioContext.decodeAudioData(arrayBuffer); mainEditorState.history = []; mainEditorState.historyIndex = -1; saveHistoryState(mainEditorState); setupControls(); setLoading(false, '解碼完成！請在主音軌上拖曳以選取範圍。'); } catch (error) { setLoading(false, `錯誤：無法解碼此檔案。`); console.error('解碼錯誤:', error); } }
         function setupControls() { initialScreen.classList.add('hidden'); mainControlsSection.classList.remove('hidden'); clipsPanel.classList.remove('hidden'); if (toggleClipsPanelBtn) toggleClipsPanelBtn.textContent = '<< 收合'; mainEditorState.dom.findSegmentsBtn.disabled = false; exportMixedBtn.disabled = false; playAllBtn.disabled = false; updateUIAfterDestructiveEdit(mainEditorState); }
         function handleDragStart(e, state) { if (!state.buffer) return; e.preventDefault(); state.isDragging = true; if (state.dom.floatingPlayBtn) state.dom.floatingPlayBtn.classList.add('hidden'); const rect = state.dom.canvas.getBoundingClientRect(); const x = e.clientX - rect.left; let y = e.clientY - rect.top; if (y < RULER_HEIGHT && state === mainEditorState) return; state.dragStartSeconds = state.viewStartTime + (x / state.dom.canvas.width) * (state.viewEndTime - state.viewStartTime); state.dragStartSeconds = Math.max(0, state.dragStartSeconds); state.dom.startTimeInput.value = state.dragStartSeconds.toFixed(3); state.dom.endTimeInput.value = state.dragStartSeconds.toFixed(3); handleTimeInputChange(state); }
         function handleDragMove(e, state) { if (!state.isDragging || !state.buffer) return; const rect = state.dom.canvas.getBoundingClientRect(); const x = e.clientX - rect.left; let currentSeconds = state.viewStartTime + (x / state.dom.canvas.width) * (state.viewEndTime - state.viewStartTime); currentSeconds = Math.max(0, Math.min(state.buffer.duration, currentSeconds)); if (currentSeconds > state.dragStartSeconds) { state.dom.startTimeInput.value = state.dragStartSeconds.toFixed(3); state.dom.endTimeInput.value = currentSeconds.toFixed(3); } else { state.dom.startTimeInput.value = currentSeconds.toFixed(3); state.dom.endTimeInput.value = state.dragStartSeconds.toFixed(3); } handleTimeInputChange(state); }
@@ -1680,7 +1857,95 @@
         function bufferToWav(buffer) { const numOfChan = buffer.numberOfChannels, length = buffer.length * numOfChan * 2 + 44; const abuffer = new ArrayBuffer(length), view = new DataView(abuffer); let pos = 0; const setUint16 = data => { view.setUint16(pos, data, true); pos += 2; }; const setUint32 = data => { view.setUint32(pos, data, true); pos += 4; }; setUint32(0x46464952); setUint32(length - 8); setUint32(0x45564157); setUint32(0x20746d66); setUint32(16); setUint16(1); setUint16(numOfChan); setUint32(buffer.sampleRate); setUint32(buffer.sampleRate * 2 * numOfChan); setUint16(numOfChan * 2); setUint16(16); setUint32(0x61746164); setUint32(length - pos - 4); const channels = Array.from({ length: buffer.numberOfChannels }, (_, i) => buffer.getChannelData(i)); for (let offset = 0; offset < buffer.length; offset++) { for (let i = 0; i < numOfChan; i++) { let sample = Math.max(-1, Math.min(1, channels[i][offset])); view.setInt16(pos, sample < 0 ? sample * 32768 : sample * 32767, true); pos += 2; } } return new Blob([view], { type: 'audio/wav' }); }
         function bufferToMp3(buffer) { const numChannels = buffer.numberOfChannels, sampleRate = buffer.sampleRate, kbps = 128; const mp3encoder = new lamejs.Mp3Encoder(numChannels, sampleRate, kbps); const samples = []; for (let i = 0; i < numChannels; i++) { const channelData = buffer.getChannelData(i); const int16ChannelData = new Int16Array(channelData.length); for (let j = 0; j < channelData.length; j++) { int16ChannelData[j] = Math.max(-32768, Math.min(32767, channelData[j] * 32767)); } samples.push(int16ChannelData); } const mp3Data = []; const sampleBlockSize = 1152; for (let i = 0; i < samples[0].length; i += sampleBlockSize) { const leftChunk = samples[0].subarray(i, i + sampleBlockSize); const rightChunk = numChannels > 1 ? samples[1].subarray(i, i + sampleBlockSize) : leftChunk; const mp3buf = mp3encoder.encodeBuffer(leftChunk, rightChunk); if (mp3buf.length > 0) mp3Data.push(mp3buf); } const mp3buf = mp3encoder.flush(); if (mp3buf.length > 0) mp3Data.push(mp3buf); return new Blob(mp3Data, { type: 'audio/mp3' }); }
 
+    
+        // --- Mobile Modals Logic ---
+        const mobileTimeOverlay = document.getElementById('mobile-time-overlay');
+        const mobileSearchOverlay = document.getElementById('mobile-search-overlay');
+        const openTimeBtn = document.getElementById('open-time-modal-btn');
+        const openSearchBtn = document.getElementById('open-search-modal-btn');
+        const originalTimeInputs = document.getElementById('original-time-inputs');
+        const originalSearchGroup = document.getElementById('original-search-group');
+        const mobileTimeContainer = document.getElementById('mobile-time-container');
+        const mobileSearchContainer = document.getElementById('mobile-search-container');
+        
+        function setupMobileModals() {
+            if (openTimeBtn) {
+                openTimeBtn.addEventListener('click', () => {
+                    // Move content
+                    if (window.innerWidth < 768) {
+                        Array.from(originalTimeInputs.children).forEach(child => mobileTimeContainer.appendChild(child));
+                    }
+                    mobileTimeOverlay.classList.add('open');
+                });
+                
+                document.getElementById('mobile-time-close-btn').addEventListener('click', closeTimeModal);
+                document.getElementById('mobile-time-done-btn').addEventListener('click', closeTimeModal);
+            }
+            
+            if (openSearchBtn) {
+                openSearchBtn.addEventListener('click', () => {
+                    if (window.innerWidth < 768) {
+                         const searchOptions = originalSearchGroup.querySelector('.search-options');
+                         const searchBtns = originalSearchGroup.querySelector('.flex-center');
+                         if(searchOptions) mobileSearchContainer.appendChild(searchOptions);
+                         if(searchBtns) mobileSearchContainer.appendChild(searchBtns);
+                    }
+                    mobileSearchOverlay.classList.add('open');
+                });
+                
+                document.getElementById('mobile-search-close-btn').addEventListener('click', closeSearchModal);
+                document.getElementById('mobile-search-done-btn').addEventListener('click', closeSearchModal);
+            }
+        }
+        
+        function closeTimeModal() {
+            mobileTimeOverlay.classList.remove('open');
+            // Move back on close to ensure desktop works if resized
+            Array.from(mobileTimeContainer.children).forEach(child => originalTimeInputs.appendChild(child));
+        }
+        
+        function closeSearchModal() {
+            mobileSearchOverlay.classList.remove('open');
+            Array.from(mobileSearchContainer.children).forEach(child => originalSearchGroup.appendChild(child));
+        }
+
+        setupMobileModals();
+
+        // Enable buttons when file is loaded
+        const originalSetupControls = setupControls;
+        setupControls = function() {
+            originalSetupControls();
+            if(openTimeBtn) openTimeBtn.disabled = false;
+            // search find segment is tied to selection, but the button to open modal should be enabled
+            if(openSearchBtn) openSearchBtn.disabled = false;
+        };
+
     </script>
+
+    <!-- Mobile Time Modal -->
+    <div id="mobile-time-overlay" class="mobile-modal-overlay">
+        <div class="mobile-modal-content">
+            <button id="mobile-time-close-btn" class="mobile-modal-close-btn">✕</button>
+            <h3>設定時間區間</h3>
+            <div id="mobile-time-container">
+                <!-- Inputs will be moved here on mobile -->
+            </div>
+            <button id="mobile-time-done-btn" class="button-like primary-action-btn" style="width: 100%; margin-top: 15px;">完成</button>
+        </div>
+    </div>
+
+    <!-- Mobile Search Modal -->
+    <div id="mobile-search-overlay" class="mobile-modal-overlay">
+        <div class="mobile-modal-content">
+            <button id="mobile-search-close-btn" class="mobile-modal-close-btn">✕</button>
+            <h3>智慧尋找</h3>
+            <div id="mobile-search-container">
+                <!-- Inputs will be moved here on mobile -->
+            </div>
+            <button id="mobile-search-done-btn" class="button-like primary-action-btn" style="width: 100%; margin-top: 15px;">完成</button>
+        </div>
+    </div>
+
 </body>
 
 </html>
