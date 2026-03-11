@@ -728,6 +728,84 @@
             .waveform-container { height: 140px; }
         }
 
+    
+        /* Clips Panel Mobile Overlay */
+        @media (max-width: 767px) {
+            .clips-panel {
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                width: 100vw !important;
+                height: 100vh !important;
+                z-index: 2000 !important;
+                border-radius: 0 !important;
+                margin: 0 !important;
+                max-height: none !important;
+            }
+            .clips-panel.hidden {
+                display: none !important;
+            }
+        }
+        #close-clips-panel-mobile-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            display: none;
+            z-index: 2001;
+            font-size: 20px;
+            font-weight: bold;
+        }
+        @media (max-width: 767px) {
+            #close-clips-panel-mobile-btn {
+                display: block;
+            }
+        }
+
+    
+        .wave-nav-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--light-gray);
+            border: 1px solid var(--medium-gray);
+            border-top: none;
+            border-radius: 0 0 5px 5px;
+            padding: 8px 10px;
+        }
+        .wave-nav-bar .button-like {
+            flex: 1;
+            margin: 0 5px;
+            padding: 8px 0;
+            font-size: 16px;
+            background: #fff;
+            border-color: #ccc;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        @media (min-width: 768px) {
+            .wave-nav-bar {
+                justify-content: center;
+                border: none;
+                background: none;
+                padding: 10px 0 0 0;
+            }
+            .wave-nav-bar .button-like {
+                flex: none;
+                padding: 6px 15px;
+            }
+            .waveform-container {
+                border-radius: 5px;
+            }
+        }
+        @media (max-width: 767px) {
+            .waveform-container {
+                border-radius: 5px 5px 0 0;
+                border-bottom: none;
+            }
+            .time-inputs { margin-top: 5px; }
+        }
+
     </style>
 </head>
 
@@ -783,11 +861,12 @@
                                     style="position: absolute; z-index: 20; padding: 4px 8px; font-size: 12px; transform: translate(-50%, -100%); margin-top: -5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); white-space: nowrap;">▶
                                     從此播放</button>
                             </div>
-                            <div class="flex-center" style="margin-top: 10px;"><button id="main-pan-left-btn"
-                                    class="button-like">◀</button><button id="main-zoom-out-btn"
-                                    class="button-like">-</button><button id="main-zoom-in-btn"
-                                    class="button-like">+</button><button id="main-pan-right-btn"
-                                    class="button-like">▶</button></div>
+                            <div class="wave-nav-bar">
+                                <button id="main-pan-left-btn" class="button-like">◀</button>
+                                <button id="main-zoom-out-btn" class="button-like">🔍-</button>
+                                <button id="main-zoom-in-btn" class="button-like">🔍+</button>
+                                <button id="main-pan-right-btn" class="button-like">▶</button>
+                            </div>
                         </div>
                         <div class="control-group">
                             <h3>混音軌 <span
@@ -890,6 +969,7 @@
                     </div>
         </div>
         <div class="clips-panel hidden" id="clips-panel">
+            <button id="close-clips-panel-mobile-btn" class="icon-btn">✕</button>
             <h2>剪輯片段列表</h2>
             <p style="font-size:12px; color: var(--dark-gray); margin: -10px 0 10px 0;">勾選以合併，單選以安插</p>
             <ul id="clip-list"></ul>
@@ -908,10 +988,12 @@
                 </div><canvas id="modal-waveform-canvas" class="waveform-canvas"></canvas>
                 <div id="modal-selection-overlay" class="selection-overlay"></div>
             </div>
-            <div class="flex-center" style="margin-top: 10px;"><button id="modal-pan-left-btn"
-                    class="button-like">◀</button><button id="modal-zoom-out-btn" class="button-like">-</button><button
-                    id="modal-zoom-in-btn" class="button-like">+</button><button id="modal-pan-right-btn"
-                    class="button-like">▶</button></div>
+            <div class="wave-nav-bar">
+                    <button id="modal-pan-left-btn" class="button-like">◀</button>
+                    <button id="modal-zoom-out-btn" class="button-like">🔍-</button>
+                    <button id="modal-zoom-in-btn" class="button-like">🔍+</button>
+                    <button id="modal-pan-right-btn" class="button-like">▶</button>
+                </div>
             <div class="time-inputs">
                 <div class="input-group"><label for="modal-start-time">開始</label><input type="number"
                         id="modal-start-time" step="0.001" min="0">
@@ -1012,6 +1094,12 @@
             }
         });
         
+        
+        const closeClipsPanelMobileBtn = document.getElementById('close-clips-panel-mobile-btn');
+        if (closeClipsPanelMobileBtn) {
+            closeClipsPanelMobileBtn.addEventListener('click', () => clipsPanel.classList.add('hidden'));
+        }
+
         // --- Contextual Toolbar Logic ---
         function updateContextualToolbar(hasSelection) {
             const wrapper = document.getElementById('sticky-controls-wrapper');
@@ -1315,8 +1403,13 @@
         let isResizing = false;
 
         collapseBtn.addEventListener('click', () => {
-            stickyWrapper.classList.toggle('collapsed');
-            collapseBtn.textContent = stickyWrapper.classList.contains('collapsed') ? '▲' : '▼';
+            if (window.innerWidth < 768) {
+                // On mobile, hide the contextual toolbar completely
+                stickyWrapper.classList.remove('show-contextual');
+            } else {
+                stickyWrapper.classList.toggle('collapsed');
+                collapseBtn.textContent = stickyWrapper.classList.contains('collapsed') ? '▲' : '▼';
+            }
         });
 
         resizeHandle.addEventListener('pointerdown', (e) => {
