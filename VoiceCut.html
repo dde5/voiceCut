@@ -5,70 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>全功能純前端音檔編輯工作站 (v2.2 完整版)</title>
-    <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js">
-        // --- Mobile Modals Logic ---
-        const mobileTimeOverlay = document.getElementById('mobile-time-overlay');
-        const mobileSearchOverlay = document.getElementById('mobile-search-overlay');
-        const openTimeBtn = document.getElementById('open-time-modal-btn');
-        const openSearchBtn = document.getElementById('open-search-modal-btn');
-        const originalTimeInputs = document.getElementById('original-time-inputs');
-        const originalSearchGroup = document.getElementById('original-search-group');
-        const mobileTimeContainer = document.getElementById('mobile-time-container');
-        const mobileSearchContainer = document.getElementById('mobile-search-container');
-        
-        function setupMobileModals() {
-            if (openTimeBtn) {
-                openTimeBtn.addEventListener('click', () => {
-                    // Move content
-                    if (window.innerWidth < 768) {
-                        Array.from(originalTimeInputs.children).forEach(child => mobileTimeContainer.appendChild(child));
-                    }
-                    mobileTimeOverlay.classList.add('open');
-                });
-                
-                document.getElementById('mobile-time-close-btn').addEventListener('click', closeTimeModal);
-                document.getElementById('mobile-time-done-btn').addEventListener('click', closeTimeModal);
-            }
-            
-            if (openSearchBtn) {
-                openSearchBtn.addEventListener('click', () => {
-                    if (window.innerWidth < 768) {
-                         const searchOptions = originalSearchGroup.querySelector('.search-options');
-                         const searchBtns = originalSearchGroup.querySelector('.flex-center');
-                         if(searchOptions) mobileSearchContainer.appendChild(searchOptions);
-                         if(searchBtns) mobileSearchContainer.appendChild(searchBtns);
-                    }
-                    mobileSearchOverlay.classList.add('open');
-                });
-                
-                document.getElementById('mobile-search-close-btn').addEventListener('click', closeSearchModal);
-                document.getElementById('mobile-search-done-btn').addEventListener('click', closeSearchModal);
-            }
-        }
-        
-        function closeTimeModal() {
-            mobileTimeOverlay.classList.remove('open');
-            // Move back on close to ensure desktop works if resized
-            Array.from(mobileTimeContainer.children).forEach(child => originalTimeInputs.appendChild(child));
-        }
-        
-        function closeSearchModal() {
-            mobileSearchOverlay.classList.remove('open');
-            Array.from(mobileSearchContainer.children).forEach(child => originalSearchGroup.appendChild(child));
-        }
-
-        setupMobileModals();
-
-        // Enable buttons when file is loaded
-        const originalSetupControls = setupControls;
-        setupControls = function() {
-            originalSetupControls();
-            if(openTimeBtn) openTimeBtn.disabled = false;
-            // search find segment is tied to selection, but the button to open modal should be enabled
-            if(openSearchBtn) openSearchBtn.disabled = false;
-        };
-
-    </script>
+    <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
     <style>
         :root {
             --primary-color: #1a73e8;
@@ -1028,7 +965,7 @@
                                     style="border: none; background: none; font-size: 16px; cursor: pointer; color: var(--dark-gray);">▼</button>
                             </div>
                             <div class="control-group" style="border:none; padding:0; margin:0;">
-                                <h3 style="border:none; padding:0; margin:0 0 15px 0;">主音軌操作 <span id="main-history-controls" style="margin-left:10px;"><button id="main-undo-btn" class="icon-btn" disabled style="font-size:16px;">↩️</button><button id="main-redo-btn" class="icon-btn" disabled style="font-size:16px;">↪️</button></span></h3>
+                                <h3 style="border:none; padding:0; margin:0 0 15px 0; justify-content: flex-start; gap: 15px;">主音軌操作 <span id="main-history-controls" style="margin-left:10px;"><button id="main-undo-btn" class="icon-btn" disabled style="font-size:16px;">↩️</button><button id="main-redo-btn" class="icon-btn" disabled style="font-size:16px;">↪️</button></span></h3>
                                 <div class="flex-center">
                                     <button id="main-play-btn" class="button-like" disabled>▶ 播放選區</button>
                                     <button id="amplify-btn" class="button-like warning-btn" disabled>🔊 增強</button>
@@ -1037,6 +974,9 @@
                                     <button id="cutout-btn" class="button-like danger-btn" disabled>✂️ 剪除</button>
                                     <button id="main-extract-btn" class="button-like primary-action-btn" disabled>⎚
                                         提取</button>
+                                    <button id="open-clips-btn" class="button-like" disabled>📋 列表</button>
+                                    <button id="open-time-modal-btn" class="button-like mobile-only" disabled>⏳ 時間</button>
+                                    <button id="open-search-modal-btn" class="button-like mobile-only" disabled>🔍 尋找</button>
                                 </div>
                             </div>
                             <div class="control-group" style="border:none; padding:0; margin:15px 0 0 0;">
@@ -1117,7 +1057,7 @@
                 </div>
             </div>
             <div class="control-group">
-                <h3>片段操作 (此處操作會修改片段本身) <span id="modal-history-controls" style="margin-left:10px;"><button id="modal-undo-btn" class="icon-btn" disabled style="font-size:16px;">↩️</button><button id="modal-redo-btn" class="icon-btn" disabled style="font-size:16px;">↪️</button></span></h3>
+                <h3 style="justify-content: flex-start; gap: 15px;">片段操作 (此處操作會修改片段本身) <span id="modal-history-controls" style="margin-left:10px;"><button id="modal-undo-btn" class="icon-btn" disabled style="font-size:16px;">↩️</button><button id="modal-redo-btn" class="icon-btn" disabled style="font-size:16px;">↪️</button></span></h3>
                 <div class="flex-center">
                     <button id="modal-amplify-btn" class="button-like warning-btn" disabled>🔊 增強</button>
                     <button id="modal-keep-btn" class="button-like primary-alt-btn" disabled>🎯 保留</button>
@@ -1916,9 +1856,19 @@
         setupControls = function() {
             originalSetupControls();
             if(openTimeBtn) openTimeBtn.disabled = false;
-            // search find segment is tied to selection, but the button to open modal should be enabled
             if(openSearchBtn) openSearchBtn.disabled = false;
+            if(openClipsBtn) openClipsBtn.disabled = false;
         };
+
+        const openClipsBtn = document.getElementById('open-clips-btn');
+        if (openClipsBtn) {
+            openClipsBtn.addEventListener('click', () => {
+                clipsPanel.classList.remove('hidden');
+                if (window.innerWidth < 768) {
+                    clipsPanel.scrollIntoView({behavior: 'smooth'});
+                }
+            });
+        }
 
     </script>
 
