@@ -811,7 +811,7 @@
         .mobile-modal-overlay {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.7);
+            background: rgba(0,0,0,0.4);
             z-index: 2005;
             display: flex;
             justify-content: center;
@@ -852,6 +852,14 @@
         @media (max-width: 767px) {
             .mobile-hide-original {
                 display: none !important;
+            }
+            #sticky-controls-wrapper {
+                max-height: 45vh;
+                overflow-y: auto;
+            }
+            .flex-center {
+                flex-wrap: wrap;
+                gap: 5px;
             }
         }
 
@@ -1849,26 +1857,29 @@
             Array.from(mobileSearchContainer.children).forEach(child => originalSearchGroup.appendChild(child));
         }
 
-        setupMobileModals();
-
         // Enable buttons when file is loaded
         const originalSetupControls = setupControls;
         setupControls = function() {
             originalSetupControls();
             if(openTimeBtn) openTimeBtn.disabled = false;
             if(openSearchBtn) openSearchBtn.disabled = false;
+            const openClipsBtn = document.getElementById('open-clips-btn');
             if(openClipsBtn) openClipsBtn.disabled = false;
         };
 
-        const openClipsBtn = document.getElementById('open-clips-btn');
-        if (openClipsBtn) {
-            openClipsBtn.addEventListener('click', () => {
-                clipsPanel.classList.remove('hidden');
-                if (window.innerWidth < 768) {
-                    clipsPanel.scrollIntoView({behavior: 'smooth'});
-                }
-            });
-        }
+        document.addEventListener('DOMContentLoaded', () => {
+            setupMobileModals();
+
+            const openClipsBtn = document.getElementById('open-clips-btn');
+            if (openClipsBtn) {
+                openClipsBtn.addEventListener('click', () => {
+                    clipsPanel.classList.remove('hidden');
+                    if (window.innerWidth < 768) {
+                        clipsPanel.scrollIntoView({behavior: 'smooth'});
+                    }
+                });
+            }
+        });
 
     </script>
 
